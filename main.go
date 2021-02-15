@@ -59,27 +59,27 @@ func main() {
 		MetricsBindAddress: metricsAddr,
 		Port:               9443,
 		LeaderElection:     enableLeaderElection,
-		LeaderElectionID:   "9d16a26c.example.com",
+		LeaderElectionID:   "c6f81ab3.example.com",
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
 
-	if err = (&controllers.SkydiveAnalyzerReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("SkydiveAnalyzer"),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "SkydiveAnalyzer")
-		os.Exit(1)
-	}
 	if err = (&controllers.SkydiveAgentsReconciler{
 		Client: mgr.GetClient(),
 		Log:    ctrl.Log.WithName("controllers").WithName("SkydiveAgents"),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "SkydiveAgents")
+		os.Exit(1)
+	}
+	if err = (&controllers.SkydiveAnalyzerReconciler{
+		Client: mgr.GetClient(),
+		Log:    ctrl.Log.WithName("controllers").WithName("SkydiveAnalyzer"),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "SkydiveAnalyzer")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder

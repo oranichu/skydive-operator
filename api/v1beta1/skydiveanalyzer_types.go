@@ -28,8 +28,9 @@ type SkydiveAnalyzerSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of SkydiveAnalyzer. Edit SkydiveAnalyzer_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// +optional
+	// +kubebuilder:default=1
+	Replicas *int32 `json:"replicas,omitempty"`
 }
 
 // SkydiveAnalyzerStatus defines the observed state of SkydiveAnalyzer
@@ -39,6 +40,7 @@ type SkydiveAnalyzerStatus struct {
 }
 
 // +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
 
 // SkydiveAnalyzer is the Schema for the skydiveanalyzers API
 type SkydiveAnalyzer struct {

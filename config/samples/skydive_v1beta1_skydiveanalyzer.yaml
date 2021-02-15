@@ -1,0 +1,7 @@
+apiVersion: skydive.example.com/v1beta1
+kind: SkydiveAnalyzer
+metadata:
+  name: skydiveanalyzer-sample
+spec:
+  # Add fields here
+  foo: bar

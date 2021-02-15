@@ -2,9 +2,9 @@ domain: example.com
 repo: skydive
 resources:
 - group: skydive
-  kind: SkydiveAnalyzer
+  kind: SkydiveAgents
   version: v1beta1
 - group: skydive
-  kind: SkydiveAgents
+  kind: SkydiveAnalyzer
   version: v1beta1
 version: "2"

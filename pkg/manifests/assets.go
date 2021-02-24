@@ -23,13 +23,20 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
-	"k8s.io/klog/v2"
+	"k8s.io/klog"
 )
 
 type Assets struct {
 	mtx       sync.Mutex
 	assetsDir string
 	data      map[string][]byte
+}
+
+func NewAssets(assetsDir string) *Assets {
+	return &Assets{
+		assetsDir: assetsDir,
+		data:      make(map[string][]byte),
+	}
 }
 
 func (a *Assets) GetAsset(name string) ([]byte, error) {

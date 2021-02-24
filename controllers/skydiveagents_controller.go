@@ -37,7 +37,7 @@ type SkydiveAgentsReconciler struct {
 // +kubebuilder:rbac:groups=skydive.example.com,resources=skydiveagents,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=skydive.example.com,resources=skydiveagents/status,verbs=get;update;patch
 
-func (r *SkydiveAgentsReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
+func (r *SkydiveAgentsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = context.Background()
 	_ = r.Log.WithValues("skydiveagents", req.NamespacedName)
 

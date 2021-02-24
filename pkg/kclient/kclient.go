@@ -12,11 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package client
+package kclient
 
 import (
+	"context"
 	"github.com/imdario/mergo"
+	"io"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/client-go/rest"
 	"reflect"
 	"strings"
 	"time"
@@ -34,7 +38,7 @@ const (
 	metadataPrefix          = "monitoring.openshift.io/"
 )
 
-type Client struct {
+type KClient struct {
 	version               string
 	namespace             string
 	userWorkloadNamespace string
@@ -43,8 +47,33 @@ type Client struct {
 	eclient               apiextensionsclient.Interface
 }
 
-func (c *Client) CreateOrUpdateDeployment(dep *appsv1.Deployment) error {
-	existing, err := c.kclient.AppsV1().Deployments(dep.GetNamespace()).Get(dep.GetName(), metav1.GetOptions{})
+func New(cfg *rest.Config, version string, namespace, namespaceSelector string) (*KClient, error) {
+	kclient, err := kubernetes.NewForConfig(cfg)
+	if err != nil {
+		return nil, errors.Wrap(err, "creating kubernetes clientset kclient")
+	}
+
+	eclient, err := apiextensionsclient.NewForConfig(cfg)
+	if err != nil {
+		return nil, errors.Wrap(err, "creating apiextensions kclient")
+	}
+
+	// SCC moved to CRD and CRD does not handle protobuf. Force the SCC kclient to use JSON instead.
+	jsonClientConfig := rest.CopyConfig(cfg)
+	jsonClientConfig.ContentConfig.AcceptContentTypes = "application/json"
+	jsonClientConfig.ContentConfig.ContentType = "application/json"
+
+	return &KClient{
+		version:           version,
+		namespace:         namespace,
+		namespaceSelector: namespaceSelector,
+		kclient:           kclient,
+		eclient:           eclient,
+	}, nil
+}
+
+func (c *KClient) CreateOrUpdateDeployment(dep *appsv1.Deployment) error {
+	existing, err := c.kclient.AppsV1().Deployments(dep.GetNamespace()).Get(context.TODO(), dep.GetName(), metav1.GetOptions{})
 
 	if apierrors.IsNotFound(err) {
 		err = c.CreateDeployment(dep)
@@ -80,19 +109,10 @@ func (c *Client) CreateOrUpdateDeployment(dep *appsv1.Deployment) error {
 	return nil
 }
 
-func (c *Client) CreateDeployment(dep *appsv1.Deployment) error {
-	d, err := c.kclient.AppsV1().Deployments(dep.GetNamespace()).Create(dep)
-	if err != nil {
-		return err
-	}
-
-	return c.WaitForDeploymentRollout(d)
-}
-
-func (c *Client) WaitForDeploymentRollout(dep *appsv1.Deployment) error {
+func (c *KClient) WaitForDeploymentRollout(dep *appsv1.Deployment) error {
 	var lastErr error
 	if err := wait.Poll(time.Second, deploymentCreateTimeout, func() (bool, error) {
-		d, err := c.kclient.AppsV1().Deployments(dep.GetNamespace()).Get(dep.GetName(), metav1.GetOptions{})
+		d, err := c.kclient.AppsV1().Deployments(dep.GetNamespace()).Get(context.TODO(), dep.GetName(), metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -142,8 +162,27 @@ func mergeMetadata(required *metav1.ObjectMeta, existing metav1.ObjectMeta) {
 	mergo.Merge(&required.Labels, existing.Labels)
 }
 
-func (c *Client) UpdateDeployment(dep *appsv1.Deployment) error {
-	updated, err := c.kclient.AppsV1().Deployments(dep.GetNamespace()).Update(dep)
+func NewDeployment(manifest io.Reader) (*appsv1.Deployment, error) {
+	d := appsv1.Deployment{}
+	err := yaml.NewYAMLOrJSONDecoder(manifest, 100).Decode(&d)
+	if err != nil {
+		return nil, err
+	}
+
+	return &d, nil
+}
+
+func (c *KClient) CreateDeployment(dep *appsv1.Deployment) error {
+	d, err := c.kclient.AppsV1().Deployments(dep.GetNamespace()).Create(context.TODO(), dep, metav1.CreateOptions{})
+	if err != nil {
+		return err
+	}
+
+	return c.WaitForDeploymentRollout(d)
+}
+
+func (c *KClient) UpdateDeployment(dep *appsv1.Deployment) error {
+	updated, err := c.kclient.AppsV1().Deployments(dep.GetNamespace()).Update(context.TODO(), dep, metav1.UpdateOptions{})
 	if err != nil {
 		return err
 	}
@@ -151,9 +190,9 @@ func (c *Client) UpdateDeployment(dep *appsv1.Deployment) error {
 	return c.WaitForDeploymentRollout(updated)
 }
 
-func (c *Client) DeleteDeployment(d *appsv1.Deployment) error {
+func (c *KClient) DeleteDeployment(d *appsv1.Deployment) error {
 	p := metav1.DeletePropagationForeground
-	err := c.kclient.AppsV1().Deployments(d.GetNamespace()).Delete(d.GetName(), &metav1.DeleteOptions{PropagationPolicy: &p})
+	err := c.kclient.AppsV1().Deployments(d.GetNamespace()).Delete(context.TODO(), d.GetName(), metav1.DeleteOptions{PropagationPolicy: &p})
 	if apierrors.IsNotFound(err) {
 		return nil
 	}

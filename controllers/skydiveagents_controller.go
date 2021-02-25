@@ -18,6 +18,10 @@ package controllers
 
 import (
 	"context"
+	"github.com/pkg/errors"
+	"k8s.io/client-go/tools/clientcmd"
+	"skydive/pkg/kclient"
+	"skydive/pkg/manifests"
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -25,6 +29,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	skydivev1beta1 "skydive/api/v1beta1"
+)
+
+var (
+	SkydiveAgentsDaemonSet = "skydive-agents/daemon-set.yaml"
 )
 
 // SkydiveAgentsReconciler reconciles a SkydiveAgents object
@@ -36,14 +44,42 @@ type SkydiveAgentsReconciler struct {
 
 // +kubebuilder:rbac:groups=skydive.example.com,resources=skydiveagents,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=skydive.example.com,resources=skydiveagents/status,verbs=get;update;patch
-
 func (r *SkydiveAgentsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = context.Background()
-	_ = r.Log.WithValues("skydiveagents", req.NamespacedName)
+	log := r.Log.WithValues("skydiveanalyzer", req.NamespacedName)
 
-	// your logic here
+	log.Info("initializing assets for skydive-agents")
+	assets := manifests.NewAssets("assets")
 
+	log.Info("Building configuration")
+	config, err := clientcmd.BuildConfigFromFlags("", kubeconfigPath)
+	if err != nil {
+		log.Error(err, "Configuration build has failed")
+		return ctrl.Result{}, err
+	}
+
+	log.Info("Creating kubernetes client")
+	kclient_instance, err := kclient.New(config, "", namespaceName, "")
+	if err != nil {
+		log.Error(err, "Kubernets client build failed")
+		return ctrl.Result{}, err
+	}
+
+	log.Info("initializing skydive-agents DaemonSet...")
+	ds, err := kclient.NewDaemonSet(assets.MustNewAssetReader(SkydiveAgentsDaemonSet))
+	if err != nil {
+		return ctrl.Result{}, errors.Wrap(err, "initializing skydive-agents DaemonSet failed")
+	}
+	ds.Namespace = namespaceName
+
+	log.Info("Creating DaemonSet...")
+	err = kclient_instance.CreateOrUpdateDaemonSet(ds)
+	if err != nil {
+		return ctrl.Result{}, errors.Wrap(err, "UI-Route creation has failed")
+	}
+
+	log.Info("reconciling skydive-analyzer task completed successfully")
 	return ctrl.Result{}, nil
+
 }
 
 func (r *SkydiveAgentsReconciler) SetupWithManager(mgr ctrl.Manager) error {

@@ -1,15 +1,14 @@
-# Route for Skydive Analyzer
-- apiVersion: v1
-  kind: Route
-  metadata:
-    labels:
-      app: skydive-analyzer
+apiVersion: v1
+kind: Route
+metadata:
+  labels:
+    app: skydive-analyzer
+  name: skydive-analyzer
+spec:
+  port:
+    targetPort: api
+  to:
+    kind: Service
     name: skydive-analyzer
-  spec:
-    port:
-      targetPort: api
-    to:
-      kind: Service
-      name: skydive-analyzer
-      weight: 100
-    wildcardPolicy: None
+    weight: 100
+  wildcardPolicy: None
